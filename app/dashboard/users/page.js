@@ -221,7 +221,7 @@ export default function UsersPage() {
                 </div>
                 <div className="detail-item">
                   <label><Calendar size={14}/> Joined</label>
-                  <p>{selectedUser.createdAt ? new Date(selectedUser.createdAt.seconds * 1000).toLocaleString() : "N/A"}</p>
+                  <p>{selectedUser.createdAt?.seconds ? new Date(selectedUser.createdAt.seconds * 1000).toLocaleString() : "N/A"}</p>
                 </div>
                 <div className="detail-item">
                   <label><Activity size={14}/> Total Rides</label>

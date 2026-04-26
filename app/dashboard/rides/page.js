@@ -7,7 +7,8 @@ import {
   query, 
   orderBy, 
   limit,
-  onSnapshot
+  onSnapshot,
+  where
 } from "firebase/firestore";
 import { 
   RefreshCw,
@@ -15,7 +16,14 @@ import {
   Info,
   ChevronRight,
   AlertTriangle,
-  X
+  X,
+  Search,
+  MapPin,
+  Navigation,
+  User,
+  Car,
+  DollarSign,
+  Clock
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { doc, updateDoc, onSnapshot as onSnapshotDrivers } from "firebase/firestore";
@@ -33,7 +41,7 @@ export default function RidesPage() {
   const [drivers, setDrivers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedRide, setSelectedRide] = useState(null);
+  const [expandedRideId, setExpandedRideId] = useState(null);
   const [cancelReason, setCancelReason] = useState("");
   const [showCancelModal, setShowCancelModal] = useState(null);
 
@@ -48,6 +56,9 @@ export default function RidesPage() {
       }));
       setRides(rideData);
       setLoading(false);
+    }, (err) => {
+      console.error("Rides listener error", err);
+      setLoading(false);
     });
 
     // Live listener for drivers (to show on map)
@@ -58,6 +69,8 @@ export default function RidesPage() {
         ...doc.data()
       }));
       setDrivers(driverData);
+    }, (err) => {
+      console.error("Drivers listener error", err);
     });
 
     return () => {
@@ -160,13 +173,17 @@ export default function RidesPage() {
               </div>
               <div className="meta-item">
                 <Clock size={16} />
-                <span>{ride.createdAt ? new Date(ride.createdAt.seconds * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : "Now"}</span>
+                <span>{ride.createdAt?.seconds ? new Date(ride.createdAt.seconds * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : "Now"}</span>
               </div>
             </div>
 
             <div className="ride-actions">
-              <button className="btn-icon" onClick={() => setSelectedRide(ride)} title="View Details">
-                <Info size={18} />
+              <button 
+                className={`btn-icon ${expandedRideId === ride.id ? 'active' : ''}`} 
+                onClick={() => setExpandedRideId(expandedRideId === ride.id ? null : ride.id)} 
+                title="View Details"
+              >
+                {expandedRideId === ride.id ? <X size={18} /> : <Info size={18} />}
               </button>
               {['searching', 'accepted', 'arrived', 'started'].includes(ride.status) && (
                 <button className="btn-icon danger" onClick={() => setShowCancelModal(ride.id)} title="Cancel Ride">
@@ -174,83 +191,39 @@ export default function RidesPage() {
                 </button>
               )}
             </div>
+
+            {expandedRideId === ride.id && (
+              <div className="card-expansion animate-fade-in" style={{ 
+                marginTop: '16px', 
+                paddingTop: '16px', 
+                borderTop: '1px solid rgba(255,255,255,0.1)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px'
+              }}>
+                <div style={{ fontSize: '12px', color: '#94a3b8' }}>FARE BREAKDOWN</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                  <span>Base + Distance</span>
+                  <span>₹{ride.fare || 0}</span>
+                </div>
+                {ride.status === 'cancelled' && (
+                  <div style={{ fontSize: '12px', color: '#ef4444', background: 'rgba(239,68,68,0.1)', padding: '8px', borderRadius: '8px' }}>
+                    <strong>Cancelled:</strong> {ride.cancelReason || "System"}
+                  </div>
+                )}
+                <div style={{ fontSize: '11px', color: '#94a3b8' }}>
+                  User Phone: {ride.userPhoneNumber || ride.userPhone || "N/A"}
+                </div>
+                <div style={{ fontSize: '11px', color: '#94a3b8' }}>
+                  Driver Phone: {ride.driverPhoneNumber || ride.driverPhone || "N/A"}
+                </div>
+              </div>
+            )}
           </div>
         ))}
       </div>
 
-      {/* Ride Details Modal */}
-      {selectedRide && (
-        <div className="modal-overlay" onClick={() => setSelectedRide(null)}>
-          <div className="modal-content glass animate-fade-in" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>Ride Details</h2>
-              <button className="close-btn" onClick={() => setSelectedRide(null)}><X size={24}/></button>
-            </div>
-            
-            <div className="ride-detail-body">
-              <div className="status-banner">
-                <span className={`status-pill ${selectedRide.status}`}>{selectedRide.status}</span>
-                <p>Ride ID: #{selectedRide.id}</p>
-              </div>
-
-              <div className="locations-detailed card">
-                <div className="loc-item">
-                  <div className="dot pickup"></div>
-                  <div className="info">
-                    <p className="label">Pickup Address</p>
-                    <p className="addr">{selectedRide.pickupAddress}</p>
-                  </div>
-                </div>
-                <div className="loc-line"></div>
-                <div className="loc-item">
-                  <div className="dot drop"></div>
-                  <div className="info">
-                    <p className="label">Destination Address</p>
-                    <p className="addr">{selectedRide.destinationAddress}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="participants-grid">
-                <div className="participant card">
-                  <div className="header"><User size={16}/> Customer</div>
-                  <div className="body">
-                    <p className="name">{selectedRide.userName || "Guest"}</p>
-                    <p className="sub">{selectedRide.userPhoneNumber || "No Phone"}</p>
-                  </div>
-                </div>
-                <div className="participant card">
-                  <div className="header"><Car size={16}/> Driver</div>
-                  <div className="body">
-                    <p className="name">{selectedRide.driverName || "Assigning..."}</p>
-                    <p className="sub">{selectedRide.driverPhoneNumber || "N/A"}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="fare-breakdown card">
-                <div className="header"><DollarSign size={16}/> Fare Breakdown</div>
-                <div className="breakdown-list">
-                  <div className="item"><span>Base Fare</span> <span>₹{selectedRide.baseFare || 50}</span></div>
-                  <div className="item"><span>Distance ({selectedRide.distance || 0} km)</span> <span>₹{selectedRide.distanceFare || 0}</span></div>
-                  {selectedRide.surgeMultiplier > 1 && (
-                    <div className="item surge"><span>Surge Pricing (x{selectedRide.surgeMultiplier})</span> <span>+₹{selectedRide.surgeAmount || 0}</span></div>
-                  )}
-                  <div className="item total"><span>Total Amount</span> <span>₹{selectedRide.fare || 0}</span></div>
-                </div>
-              </div>
-
-              {selectedRide.status === 'cancelled' && (
-                <div className="cancel-info card danger">
-                  <div className="header"><AlertTriangle size={16}/> Cancellation Info</div>
-                  <p>Reason: {selectedRide.cancelReason || "Not specified"}</p>
-                  <p>By: {selectedRide.cancelledBy || "System"}</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Global Modals Removed for Inline Expansion */}
 
       {/* Cancel Confirmation Modal */}
       {showCancelModal && (
@@ -462,6 +435,11 @@ export default function RidesPage() {
         }
         .modal-content {
           width: 100%; max-width: 600px; padding: 32px; border-radius: 24px;
+          background: var(--surface);
+          border: 1px solid var(--border);
+          box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+          position: relative;
+          z-index: 1001;
         }
         .ride-detail-body { display: flex; flex-direction: column; gap: 20px; }
         .status-banner { text-align: center; margin-bottom: 8px; }

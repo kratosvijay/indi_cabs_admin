@@ -23,11 +23,13 @@ export default function PaymentsPage() {
     totalPayouts: 0,
     pendingSettlements: 0
   });
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortConfig, setSortConfig] = useState({ key: 'createdAt', direction: 'desc' });
 
   useEffect(() => {
     async function fetchPayments() {
       try {
-        const q = query(collection(db, "ride_requests"), orderBy("createdAt", "desc"), limit(50));
+        const q = query(collection(db, "ride_requests"), orderBy("createdAt", "desc"), limit(1000));
         const snap = await getDocs(q);
         const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         
@@ -54,6 +56,37 @@ export default function PaymentsPage() {
     }
     fetchPayments();
   }, []);
+
+  const handleSort = (key) => {
+    let direction = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const filteredTransactions = transactions.filter(item => 
+    item.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (item.driverName || item.driverDisplayName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (item.userName || item.userDisplayName || "").toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const sortedTransactions = [...filteredTransactions].sort((a, b) => {
+    if (!sortConfig.key) return 0;
+    
+    let aVal = a[sortConfig.key];
+    let bVal = b[sortConfig.key];
+
+    // Handle nested dates/timestamps
+    if (sortConfig.key === 'createdAt') {
+      aVal = aVal?.seconds || new Date(aVal).getTime() || 0;
+      bVal = bVal?.seconds || new Date(bVal).getTime() || 0;
+    }
+
+    if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+    if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+    return 0;
+  });
 
   return (
     <div className="payments-page">
@@ -94,7 +127,12 @@ export default function PaymentsPage() {
       <div className="card toolbar glass">
         <div className="search-box">
           <Search size={20} className="search-icon" />
-          <input type="text" placeholder="Search by Transaction ID or Driver..." />
+          <input 
+            type="text" 
+            placeholder="Search by Ride ID, Driver or Customer..." 
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
         </div>
         
         <div className="actions">
@@ -102,7 +140,7 @@ export default function PaymentsPage() {
             <Filter size={18} />
             <span>Filter</span>
           </button>
-           <button className="action-btn primary" onClick={() => exportToCSV(transactions, 'payments_report')}>
+           <button className="action-btn primary" onClick={() => exportToCSV(filteredTransactions, 'payments_report')}>
             <Download size={18} />
             <span>Export CSV</span>
           </button>
@@ -114,8 +152,12 @@ export default function PaymentsPage() {
         <table className="data-table">
           <thead>
             <tr>
-              <th>Ride ID</th>
-              <th>Date & Time</th>
+              <th onClick={() => handleSort('id')} style={{ cursor: 'pointer' }}>
+                Ride ID {sortConfig.key === 'id' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+              </th>
+              <th onClick={() => handleSort('createdAt')} style={{ cursor: 'pointer' }}>
+                Date & Time {sortConfig.key === 'createdAt' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+              </th>
               <th>Driver</th>
               <th>Customer</th>
               <th>Amount</th>
@@ -125,19 +167,25 @@ export default function PaymentsPage() {
           <tbody>
             {loading ? (
               <tr><td colSpan="6" className="text-center py-10">Loading transactions...</td></tr>
-            ) : transactions.length === 0 ? (
+            ) : sortedTransactions.length === 0 ? (
               <tr><td colSpan="6" className="text-center py-10">No transactions found.</td></tr>
             ) : (
-              transactions.map(item => (
+              sortedTransactions.map(item => (
                 <tr key={item.id} className="table-row">
-                  <td><span className="tx-id">#{item.id.substring(0, 8)}</span></td>
+                  <td><span className="tx-id">#{item.id}</span></td>
                   <td>
                     <div className="date-cell">
-                      {item.createdAt ? new Date(item.createdAt.seconds * 1000).toLocaleString() : "N/A"}
+                      {(() => {
+                        const d = item.createdAt;
+                        if (!d) return "N/A";
+                        if (d.seconds) return new Date(d.seconds * 1000).toLocaleString();
+                        const parsed = new Date(d);
+                        return isNaN(parsed) ? "N/A" : parsed.toLocaleString();
+                      })()}
                     </div>
                   </td>
-                  <td>{item.driverName || "N/A"}</td>
-                  <td>{item.userName || "N/A"}</td>
+                  <td>{item.driverName || item.driverDisplayName || "N/A"}</td>
+                  <td>{item.userName || item.userDisplayName || "N/A"}</td>
                   <td><span className="amount">₹{item.fare || 0}</span></td>
                   <td>
                     <span className={`status-pill ${item.status}`}>

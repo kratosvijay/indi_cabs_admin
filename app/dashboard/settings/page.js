@@ -14,7 +14,8 @@ import {
   Save,
   Globe,
   Smartphone,
-  Info
+  Info,
+  DollarSign
 } from "lucide-react";
 import { db } from "../../../lib/firebase";
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
@@ -193,6 +194,50 @@ export default function SettingsPage() {
                     <div className="form-group">
                       <label>Support Email</label>
                       <input type="email" value={config.supportEmail} onChange={e => setConfig({...config, supportEmail: e.target.value})}/>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "security" && (
+            <div className="settings-section animate-fade-in">
+              <h3>Security Settings</h3>
+              <p className="section-desc">Manage your account security and administrative access.</p>
+              
+              <div className="config-groups">
+                <div className="config-group-card card">
+                  <h4><Lock size={16}/> Password Management</h4>
+                  <div className="form-grid">
+                    <div className="form-group">
+                      <label>New Password</label>
+                      <input type="password" placeholder="••••••••" />
+                    </div>
+                    <div className="form-group">
+                      <label>Confirm Password</label>
+                      <input type="password" placeholder="••••••••" />
+                    </div>
+                  </div>
+                  <button className="btn-primary mt-4" style={{width: 'fit-content', marginTop: '16px'}}>Update Password</button>
+                </div>
+
+                <div className="config-group-card card">
+                  <h4><Shield size={16}/> Access Security</h4>
+                  <div className="status-list">
+                    <div className="status-item">
+                      <div className="status-details">
+                        <p className="status-label">Two-Factor Authentication</p>
+                        <p className="status-value">Disabled</p>
+                      </div>
+                      <button className="action-btn">Enable</button>
+                    </div>
+                    <div className="status-item">
+                      <div className="status-details">
+                        <p className="status-label">Active Sessions</p>
+                        <p className="status-value">1 Device active</p>
+                      </div>
+                      <button className="action-btn">Manage</button>
                     </div>
                   </div>
                 </div>
