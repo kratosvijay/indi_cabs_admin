@@ -29,16 +29,16 @@ cd ../..
 
 # 2. Build & Deploy Portfolio Website
 echo "🖥️ Step 2: Building Portfolio Website..."
-cd portfolio
+cd ../portfolio
 export PATH=$PATH:/usr/local/bin
 npm config set cache /Users/kingofhell/Projects/indi_cabs_admin/.npm-cache
 npm run build
 
 if [ -d "out" ]; then
     echo "✅ Build successful. Preparing for site deployment..."
-    cd ..
+    cd ../indi_cabs_admin
     mkdir -p deploy_temp/site
-    cp -r portfolio/out/* deploy_temp/site/
+    cp -r ../portfolio/out/* deploy_temp/site/
     cd deploy_temp/site
     touch .nojekyll # Disable Jekyll to allow folders starting with _
     # Fix absolute paths to relative paths for GitHub Pages

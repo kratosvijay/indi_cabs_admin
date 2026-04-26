@@ -13,6 +13,7 @@ import {
   CheckCircle,
   Clock
 } from "lucide-react";
+import { exportToCSV } from "../../../lib/utils";
 
 export default function PaymentsPage() {
   const [transactions, setTransactions] = useState([]);
@@ -101,7 +102,7 @@ export default function PaymentsPage() {
             <Filter size={18} />
             <span>Filter</span>
           </button>
-          <button className="action-btn primary">
+           <button className="action-btn primary" onClick={() => exportToCSV(transactions, 'payments_report')}>
             <Download size={18} />
             <span>Export CSV</span>
           </button>

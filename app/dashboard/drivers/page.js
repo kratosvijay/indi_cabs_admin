@@ -8,7 +8,8 @@ import {
   updateDoc, 
   query, 
   orderBy,
-  where
+  where,
+  deleteDoc
 } from "firebase/firestore";
 import { 
   Search, 
@@ -22,10 +23,19 @@ import {
   MoreVertical,
   Eye,
   Check,
-  X
+  X,
+  UserX,
+  FileText,
+  AlertTriangle,
+  History,
+  TrendingUp,
+  CreditCard
 } from "lucide-react";
+import { logAdminAction } from "../../../lib/utils";
+import { useAuth } from "../../../lib/AuthContext";
 
 export default function DriversPage() {
+  const { user: adminUser } = useAuth();
   const [drivers, setDrivers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -55,10 +65,11 @@ export default function DriversPage() {
     }
   }
 
-  const handleApprove = async (driverId) => {
+   const handleApprove = async (driverId) => {
     if (!confirm("Approve this driver? They will be allowed to take rides.")) return;
     try {
       await updateDoc(doc(db, "drivers", driverId), { status: "approved", approvedAt: new Date() });
+      await logAdminAction(db, adminUser.email, "Approved driver", driverId);
       fetchDrivers();
     } catch (err) { alert("Error approving driver: " + err.message); }
   };
@@ -67,8 +78,26 @@ export default function DriversPage() {
     if (!confirm("Reject this driver?")) return;
     try {
       await updateDoc(doc(db, "drivers", driverId), { status: "rejected" });
+      await logAdminAction(db, adminUser.email, "Rejected driver", driverId);
       fetchDrivers();
     } catch (err) { alert("Error rejecting driver: " + err.message); }
+  };
+
+  const handleDeactivate = async (driverId) => {
+    if (!confirm("Deactivate this driver? They will not be able to take rides.")) return;
+    try {
+      await updateDoc(doc(db, "drivers", driverId), { status: "deactivated" });
+      await logAdminAction(db, adminUser.email, "Deactivated driver", driverId);
+      fetchDrivers();
+    } catch (err) { alert("Error deactivating driver: " + err.message); }
+  };
+
+  const handleActivate = async (driverId) => {
+    try {
+      await updateDoc(doc(db, "drivers", driverId), { status: "approved" });
+      await logAdminAction(db, adminUser.email, "Activated driver", driverId);
+      fetchDrivers();
+    } catch (err) { alert("Error activating driver: " + err.message); }
   };
 
   const resolveName = (d) => {
@@ -166,18 +195,28 @@ export default function DriversPage() {
                     </div>
                   </td>
                   <td>
-                    <div className="actions-cell">
+                     <div className="actions-cell">
                       <button className="action-btn view-btn" title="View Details" onClick={() => setSelectedDriver(driver)}>
                         <Eye size={18} />
                       </button>
-                      {driver.status !== "approved" && (
-                        <button className="action-btn approve-btn" title="Approve" onClick={() => handleApprove(driver.id)}>
-                          <Check size={18} />
+                      {driver.status === "pending" && (
+                        <>
+                          <button className="action-btn approve-btn" title="Approve" onClick={() => handleApprove(driver.id)}>
+                            <Check size={18} />
+                          </button>
+                          <button className="action-btn reject-btn" title="Reject" onClick={() => handleReject(driver.id)}>
+                            <X size={18} />
+                          </button>
+                        </>
+                      )}
+                      {driver.status === "approved" && (
+                        <button className="action-btn deactivate-btn" title="Deactivate" onClick={() => handleDeactivate(driver.id)}>
+                          <UserX size={18} />
                         </button>
                       )}
-                      {driver.status !== "rejected" && (
-                        <button className="action-btn reject-btn" title="Reject" onClick={() => handleReject(driver.id)}>
-                          <X size={18} />
+                      {(driver.status === "rejected" || driver.status === "deactivated") && (
+                        <button className="action-btn activate-btn" title="Activate" onClick={() => handleActivate(driver.id)}>
+                          <Check size={18} />
                         </button>
                       )}
                     </div>
@@ -188,6 +227,99 @@ export default function DriversPage() {
           </tbody>
         </table>
       </div>
+
+      {/* Driver Profile Modal */}
+      {selectedDriver && (
+        <div className="modal-overlay" onClick={() => setSelectedDriver(null)}>
+          <div className="modal-content glass animate-fade-in" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Driver Profile</h2>
+              <button className="close-btn" onClick={() => setSelectedDriver(null)}><X size={24}/></button>
+            </div>
+
+            <div className="profile-details">
+              <div className="profile-main">
+                <div className="large-avatar">
+                  {selectedDriver.photoURL || selectedDriver.photoUrl ? (
+                    <img src={selectedDriver.photoURL || selectedDriver.photoUrl} alt=""/>
+                  ) : <User size={40}/>}
+                </div>
+                <div className="main-info">
+                  <h3>{resolveName(selectedDriver)}</h3>
+                  <p className="uid">ID: {selectedDriver.id}</p>
+                  <span className={`status-badge ${selectedDriver.status || 'pending'}`}>
+                    {selectedDriver.status || 'pending'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="tabs-container">
+                <div className="details-grid">
+                  <div className="detail-item">
+                    <label><Phone size={14}/> Phone</label>
+                    <p>{selectedDriver.phoneNumber}</p>
+                  </div>
+                  <div className="detail-item">
+                    <label><Mail size={14}/> Email</label>
+                    <p>{selectedDriver.email || "N/A"}</p>
+                  </div>
+                  <div className="detail-item">
+                    <label><TrendingUp size={14}/> Rating</label>
+                    <p>{selectedDriver.rating || "N/A"} ⭐</p>
+                  </div>
+                  <div className="detail-item">
+                    <label><CreditCard size={14}/> Total Earnings</label>
+                    <p>₹{selectedDriver.earnings || 0}</p>
+                  </div>
+                </div>
+
+                <div className="documents-section">
+                  <h4><FileText size={16}/> Verification Documents</h4>
+                  <div className="docs-grid">
+                    <div className="doc-card">
+                      <p className="doc-label">Aadhar Card</p>
+                      {selectedDriver.aadharUrl ? <img src={selectedDriver.aadharUrl} alt="Aadhar"/> : <div className="no-doc">Not Uploaded</div>}
+                    </div>
+                    <div className="doc-card">
+                      <p className="doc-label">Driving License</p>
+                      {selectedDriver.licenseUrl ? <img src={selectedDriver.licenseUrl} alt="License"/> : <div className="no-doc">Not Uploaded</div>}
+                    </div>
+                    <div className="doc-card">
+                      <p className="doc-label">Vehicle RC</p>
+                      {selectedDriver.rcUrl ? <img src={selectedDriver.rcUrl} alt="RC"/> : <div className="no-doc">Not Uploaded</div>}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="vehicle-info">
+                  <h4><History size={16}/> Vehicle Details</h4>
+                  <div className="info-row">
+                    <span>Model:</span> <strong>{selectedDriver.carModel || "N/A"}</strong>
+                  </div>
+                  <div className="info-row">
+                    <span>Number:</span> <strong>{selectedDriver.carNumber || "N/A"}</strong>
+                  </div>
+                  <div className="info-row">
+                    <span>Type:</span> <strong>{selectedDriver.carType || "Standard"}</strong>
+                  </div>
+                </div>
+              </div>
+
+              <div className="modal-actions">
+                {selectedDriver.status === "pending" && (
+                  <>
+                    <button className="btn-approve" onClick={() => {handleApprove(selectedDriver.id); setSelectedDriver(null);}}>Approve Driver</button>
+                    <button className="btn-reject" onClick={() => {handleReject(selectedDriver.id); setSelectedDriver(null);}}>Reject Driver</button>
+                  </>
+                )}
+                {selectedDriver.status === "approved" && (
+                   <button className="btn-reject" onClick={() => {handleDeactivate(selectedDriver.id); setSelectedDriver(null);}}>Deactivate Driver</button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style jsx>{`
         .drivers-page {
@@ -311,7 +443,7 @@ export default function DriversPage() {
         }
         .status-badge.approved { background: rgba(16, 185, 129, 0.1); color: var(--success); }
         .status-badge.pending { background: rgba(245, 158, 11, 0.1); color: #f59e0b; }
-        .status-badge.rejected { background: rgba(239, 68, 68, 0.1); color: var(--danger); }
+        .status-badge.rejected, .status-badge.deactivated { background: rgba(239, 68, 68, 0.1); color: var(--danger); }
 
         .actions-cell {
           display: flex;
@@ -331,8 +463,71 @@ export default function DriversPage() {
           color: var(--text-muted);
         }
         .view-btn:hover { background: var(--primary); color: white; border-color: var(--primary); }
-        .approve-btn:hover { background: var(--success); color: white; border-color: var(--success); }
-        .reject-btn:hover { background: var(--danger); color: white; border-color: var(--danger); }
+        .approve-btn:hover, .activate-btn:hover { background: var(--success); color: white; border-color: var(--success); }
+        .reject-btn:hover, .deactivate-btn:hover { background: var(--danger); color: white; border-color: var(--danger); }
+
+        /* Modal Styles */
+        .modal-overlay {
+          position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+          background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
+          z-index: 1000; display: flex; align-items: center; justify-content: center;
+        }
+        .modal-content {
+          width: 100%; max-width: 700px; max-height: 90vh; overflow-y: auto;
+          padding: 32px; border-radius: 24px; position: relative;
+        }
+        .modal-header {
+          display: flex; justify-content: space-between; align-items: center;
+          margin-bottom: 24px;
+        }
+        .close-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; }
+
+        .profile-main { display: flex; gap: 24px; align-items: center; margin-bottom: 32px; }
+        .large-avatar {
+          width: 80px; height: 80px; border-radius: 20px;
+          background: var(--surface-hover); display: flex; align-items: center; justify-content: center;
+          overflow: hidden; border: 2px solid var(--border);
+        }
+        .large-avatar img { width: 100%; height: 100%; object-fit: cover; }
+        .main-info h3 { font-size: 24px; margin-bottom: 4px; }
+        .uid { font-size: 13px; color: var(--text-muted); margin-bottom: 8px; }
+
+        .details-grid {
+          display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+          margin-bottom: 32px; padding: 24px;
+          background: rgba(255,255,255,0.03); border-radius: 16px;
+        }
+        .detail-item label {
+          display: flex; align-items: center; gap: 6px;
+          font-size: 12px; color: var(--text-muted); text-transform: uppercase;
+          margin-bottom: 6px;
+        }
+        .detail-item p { font-weight: 500; font-size: 15px; }
+
+        .documents-section h4, .vehicle-info h4 {
+          display: flex; align-items: center; gap: 8px;
+          font-size: 16px; margin-bottom: 16px;
+        }
+        .docs-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 32px; }
+        .doc-card {
+          background: rgba(255,255,255,0.02); border: 1px solid var(--border);
+          border-radius: 12px; padding: 12px; text-align: center;
+        }
+        .doc-label { font-size: 11px; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase; }
+        .doc-card img { width: 100%; height: 100px; object-fit: cover; border-radius: 8px; }
+        .no-doc { height: 100px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--text-muted); font-style: italic; }
+
+        .vehicle-info { background: rgba(255,255,255,0.02); padding: 20px; border-radius: 16px; margin-bottom: 32px; }
+        .info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); }
+        .info-row:last-child { border-bottom: none; }
+        .info-row span { color: var(--text-muted); font-size: 14px; }
+
+        .modal-actions { display: flex; gap: 16px; }
+        .modal-actions button { flex: 1; padding: 14px; border-radius: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+        .btn-approve { background: var(--success); border: none; color: white; }
+        .btn-reject { background: var(--danger); border: none; color: white; }
+        .btn-approve:hover { background: #059669; }
+        .btn-reject:hover { background: #dc2626; }
       `}</style>
     </div>
   );

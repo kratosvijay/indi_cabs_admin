@@ -12,7 +12,9 @@ import {
   LogOut, 
   Menu, 
   X,
-  CreditCard
+  CreditCard,
+  Bell,
+  ClipboardList
 } from "lucide-react";
 import { useState } from "react";
 
@@ -42,6 +44,8 @@ export default function DashboardLayout({ children }) {
     { name: "Rides", icon: Car, path: "/dashboard/rides" },
     { name: "Users", icon: Users, path: "/dashboard/users" },
     { name: "Payments", icon: CreditCard, path: "/dashboard/payments" },
+    { name: "Notifications", icon: Bell, path: "/dashboard/notifications" },
+    { name: "Activity Logs", icon: ClipboardList, path: "/dashboard/logs" },
     { name: "Settings", icon: Settings, path: "/dashboard/settings" },
   ];
 

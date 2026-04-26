@@ -9,12 +9,66 @@ import {
   Lock, 
   Database,
   CheckCircle,
-  AlertTriangle
+  AlertTriangle,
+  RefreshCw,
+  Save,
+  Globe,
+  Smartphone,
+  Info
 } from "lucide-react";
+import { db } from "../../../lib/firebase";
+import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import { useEffect } from "react";
+import { logAdminAction } from "../../../lib/utils";
 
 export default function SettingsPage() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("profile");
+  const [loading, setLoading] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  
+  // App Config States
+  const [config, setConfig] = useState({
+    baseFare: 50,
+    pricePerKm: 15,
+    surgeMultiplier: 1.0,
+    commission: 15,
+    minFare: 70,
+    cancellationCharge: 30,
+    appVersion: "1.0.0",
+    forceUpdate: false,
+    supportPhone: "+91 9876543210",
+    supportEmail: "support@indicabs.com"
+  });
+
+  useEffect(() => {
+    fetchConfig();
+  }, []);
+
+  async function fetchConfig() {
+    try {
+      const docSnap = await getDoc(doc(db, "settings", "global"));
+      if (docSnap.exists()) {
+        setConfig(docSnap.data());
+      }
+    } catch (err) {
+      console.error("Error fetching config", err);
+    }
+  }
+
+  const handleSaveConfig = async () => {
+    setLoading(true);
+    try {
+      await setDoc(doc(db, "settings", "global"), config);
+      await logAdminAction(db, user.email, "Updated platform configuration");
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (err) {
+      alert("Error saving settings: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const tabs = [
     { id: "profile", name: "Profile Settings", icon: User },
@@ -69,26 +123,78 @@ export default function SettingsPage() {
             </div>
           )}
 
-          {activeTab === "app" && (
+           {activeTab === "app" && (
             <div className="settings-section animate-fade-in">
-              <h3>App Configuration</h3>
-              <p className="section-desc">Global settings for the Indi Cabs platform.</p>
-              
-              <div className="config-grid">
-                <div className="config-card">
-                  <div className="config-info">
-                    <h4>Fare Calculation</h4>
-                    <p>Base fare and per-km rates for different vehicle types.</p>
-                  </div>
-                  <button className="action-btn">Configure</button>
+              <div className="section-header">
+                <div>
+                  <h3>Platform Configuration</h3>
+                  <p className="section-desc">Global settings for the Indi Cabs platform.</p>
                 </div>
-                
-                <div className="config-card">
-                  <div className="config-info">
-                    <h4>Platform Commission</h4>
-                    <p>Current commission rate: 15%</p>
+                <button className="btn-primary" onClick={handleSaveConfig} disabled={loading}>
+                  {loading ? <RefreshCw size={18} className="animate-spin"/> : <Save size={18}/>}
+                  {saveSuccess ? "Saved!" : "Save Changes"}
+                </button>
+              </div>
+              
+              <div className="config-groups">
+                <div className="config-group-card card">
+                  <h4><DollarSign size={16}/> Fare & Commission</h4>
+                  <div className="form-grid">
+                    <div className="form-group">
+                      <label>Base Fare (₹)</label>
+                      <input type="number" value={config.baseFare} onChange={e => setConfig({...config, baseFare: Number(e.target.value)})}/>
+                    </div>
+                    <div className="form-group">
+                      <label>Price Per KM (₹)</label>
+                      <input type="number" value={config.pricePerKm} onChange={e => setConfig({...config, pricePerKm: Number(e.target.value)})}/>
+                    </div>
+                    <div className="form-group">
+                      <label>Platform Commission (%)</label>
+                      <input type="number" value={config.commission} onChange={e => setConfig({...config, commission: Number(e.target.value)})}/>
+                    </div>
+                    <div className="form-group">
+                      <label>Cancellation Charge (₹)</label>
+                      <input type="number" value={config.cancellationCharge} onChange={e => setConfig({...config, cancellationCharge: Number(e.target.value)})}/>
+                    </div>
+                    <div className="form-group">
+                      <label>Surge Multiplier</label>
+                      <input type="number" step="0.1" value={config.surgeMultiplier} onChange={e => setConfig({...config, surgeMultiplier: Number(e.target.value)})}/>
+                    </div>
+                    <div className="form-group">
+                      <label>Minimum Fare (₹)</label>
+                      <input type="number" value={config.minFare} onChange={e => setConfig({...config, minFare: Number(e.target.value)})}/>
+                    </div>
                   </div>
-                  <button className="action-btn">Update</button>
+                </div>
+
+                <div className="config-group-card card">
+                  <h4><Smartphone size={16}/> App Version Control</h4>
+                  <div className="form-grid">
+                    <div className="form-group">
+                      <label>Current App Version</label>
+                      <input type="text" value={config.appVersion} onChange={e => setConfig({...config, appVersion: e.target.value})}/>
+                    </div>
+                    <div className="form-group checkbox-group">
+                      <label className="checkbox-label">
+                        <input type="checkbox" checked={config.forceUpdate} onChange={e => setConfig({...config, forceUpdate: e.target.checked})}/>
+                        Force Update Required
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="config-group-card card">
+                  <h4><Info size={16}/> Support & Legal</h4>
+                  <div className="form-grid">
+                    <div className="form-group">
+                      <label>Support Phone</label>
+                      <input type="text" value={config.supportPhone} onChange={e => setConfig({...config, supportPhone: e.target.value})}/>
+                    </div>
+                    <div className="form-group">
+                      <label>Support Email</label>
+                      <input type="email" value={config.supportEmail} onChange={e => setConfig({...config, supportEmail: e.target.value})}/>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -240,22 +346,47 @@ export default function SettingsPage() {
           outline: none;
         }
 
-        .config-grid {
+        .config-groups {
           display: flex;
           flex-direction: column;
-          gap: 16px;
+          gap: 24px;
         }
-        .config-card {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
+        .config-group-card {
           padding: 24px;
-          background: rgba(255,255,255,0.02);
-          border: 1px solid var(--border);
-          border-radius: 16px;
+          border-radius: 20px;
         }
-        .config-info h4 { margin-bottom: 4px; }
-        .config-info p { font-size: 14px; color: var(--text-muted); }
+        .config-group-card h4 {
+          display: flex; align-items: center; gap: 10px;
+          margin-bottom: 24px; font-size: 16px; color: var(--accent);
+          border-bottom: 1px solid var(--border);
+          padding-bottom: 12px;
+        }
+        
+        .section-header {
+          display: flex; justify-content: space-between; align-items: flex-start;
+          margin-bottom: 32px;
+        }
+
+        .checkbox-group {
+          justify-content: center;
+        }
+        .checkbox-label {
+          display: flex; align-items: center; gap: 12px;
+          cursor: pointer; font-size: 14px; font-weight: 600;
+        }
+        .checkbox-label input {
+          width: 20px; height: 20px; accent-color: var(--primary);
+        }
+
+        .btn-primary {
+          background: var(--primary); color: white; border: none;
+          padding: 12px 24px; border-radius: 12px; font-weight: 600;
+          display: flex; align-items: center; gap: 10px; cursor: pointer;
+          transition: all 0.2s;
+        }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3); }
+        .btn-primary:disabled { opacity: 0.7; cursor: not-allowed; }
+        
         .action-btn {
           background: var(--surface-hover);
           border: 1px solid var(--border);
